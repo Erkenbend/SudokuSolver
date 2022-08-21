@@ -1,4 +1,4 @@
-package newsolver;
+package oldmodernized;
 
 import java.util.*;
 
@@ -163,7 +163,7 @@ public class Grid {
         if (c.getVal() == 0) {
 //			System.out.println("cell "+(row+1)+" "+(col+1));
 
-            ArrayList<Integer> candidates = new ArrayList<Integer>();
+            ArrayList<Integer> candidates = new ArrayList<>();
             for (int k = 1; k < 10; k++)
                 candidates.add(k);
             c.setCandidates(candidates);
@@ -258,7 +258,7 @@ public class Grid {
         Cell[][] content = this.content; // caching
         boolean hasChanged = false;
         for (int testedVal = 1; testedVal < 10; testedVal++) {
-            ArrayList<Integer> cellsFound = new ArrayList<Integer>();
+            ArrayList<Integer> cellsFound = new ArrayList<>();
             for (int i = 0; i < 3; i++) {
                 for (int j = 0; j < 3; j++) {
                     Cell c = content[3 * k + i][3 * l + j];
@@ -336,7 +336,7 @@ public class Grid {
                     for (int v : candidatesList) {
                         this.content[nextFreeCellCoordinates / 10][nextFreeCellCoordinates % 10].writeValue(v);
                         Operation newOp = new Operation(nextFreeCellCoordinates / 10, nextFreeCellCoordinates % 10, v, new Grid(this));
-                        System.out.println(newOp.toString());
+                        System.out.println(newOp);
                         stack.push(newOp);
                         nbPasses++;
                         this.backtrackingSolve();

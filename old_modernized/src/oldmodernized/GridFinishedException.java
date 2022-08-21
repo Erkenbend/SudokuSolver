@@ -1,4 +1,4 @@
-package newsolver;
+package oldmodernized;
 
 public class GridFinishedException extends RuntimeException {
 }
