@@ -19,6 +19,11 @@ public class Cell {
         }
     }
 
+    public Cell(Cell other) {
+        this.value = other.value;
+        this.candidates = new HashSet<>(other.candidates);
+    }
+
     public Optional<Integer> getValue() {
         return Optional.ofNullable(value);
     }

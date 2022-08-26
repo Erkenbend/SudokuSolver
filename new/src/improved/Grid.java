@@ -6,7 +6,7 @@ import java.util.stream.IntStream;
 
 public class Grid {
     private final Cell[][] content;
-    private final List<Cell[]> tiedCellGroups = new ArrayList<>();
+    private List<Cell[]> tiedCellGroups = new ArrayList<>();
     private boolean changeTracker = false;
 
     public Grid(int[][] rawContent) {
@@ -28,6 +28,18 @@ public class Grid {
                 this.content[rowIdx][colIdx] = new Cell(row[colIdx]);
             }
         }
+    }
+
+    public Grid(Grid other) {
+        Cell[][] content = new Cell[9][9];
+        for (int rowIdx = 0; rowIdx < 9; rowIdx++) {
+            for (int colIdx = 0; colIdx < 9; colIdx++) {
+                content[rowIdx][colIdx] = new Cell(other.content[rowIdx][colIdx]);
+            }
+        }
+        this.content = content;
+        this.changeTracker = false;
+        this.tiedCellGroups = new ArrayList<>();
     }
 
     public int[][] toIntMatrix() {
@@ -70,6 +82,25 @@ public class Grid {
         return tmpChangeTracker;
     }
 
+    /**
+     * @return true if grid is complete, false if stuck, throws if grid is invalid
+     */
+    public boolean simpleSolve() {
+        // int nbPasses = 0;
+        do {
+            this.performOnePass();
+            // System.out.printf("Pass %d:%n", ++nbPasses);
+            // System.out.println(this);
+
+            if (this.isComplete()) {
+                return true;
+            }
+
+        } while (this.isChanging());
+
+        return false;
+    }
+
     public void performOnePass() {
         if (tiedCellGroups.isEmpty()) {
             this.computeTiedCellGroups();
@@ -91,6 +122,41 @@ public class Grid {
         return true;
     }
 
+    public List<Grid> applyHypotheses() {
+        CellWithPosition bestFreeCell = this.findBestFreeCell()
+                .orElseThrow(() -> new IllegalArgumentException("No free cells"));
+
+        List<Grid> grids = new ArrayList<>();
+        for (int candidate : bestFreeCell.getTarget().getCandidates()) {
+            Grid hypothesisGrid = new Grid(this);
+            int rowIdx = bestFreeCell.getRowIdx();
+            int colIdx = bestFreeCell.getColIdx();
+            //System.out.printf("Assuming value %d in cell (%d, %d)%n", candidate, rowIdx, colIdx);
+            hypothesisGrid.content[rowIdx][colIdx].writeValue(candidate);
+            grids.add(hypothesisGrid);
+        }
+        return grids;
+    }
+
+    private Optional<CellWithPosition> findBestFreeCell() {
+        int minimalNbCandidates = 10;
+        CellWithPosition bestFreeCell = null;
+        for (int rowIdx = 0; rowIdx < 9; rowIdx++) {
+            Cell[] row = this.content[rowIdx];
+            for (int colIdx = 0; colIdx < 9; colIdx++) {
+                Cell cell = row[colIdx];
+                if (cell.getValue().isEmpty()) {
+                    int nbCandidates = cell.getCandidates().size();
+                    if (nbCandidates < minimalNbCandidates) {
+                        bestFreeCell = CellWithPosition.of(rowIdx, colIdx, cell);
+                        minimalNbCandidates = nbCandidates;
+                    }
+                }
+            }
+        }
+        return Optional.ofNullable(bestFreeCell);
+    }
+
     private void computeTiedCellGroups() {
         IntStream.range(0, 9)
                 .forEach(idx -> {
@@ -108,6 +174,7 @@ public class Grid {
                                 Cell candidate = tiedCells[candidatesIdxForValue.get(0)];
                                 if (candidate.getValue().isEmpty()) {
                                     candidate.writeValue(value);
+                                    this.changeTracker = true;
                                 }
                             }
                         }
@@ -167,7 +234,14 @@ public class Grid {
 
         List<Boolean> changesPerformed = Arrays.stream(tiedCells)
                 .filter(cell -> cell.getValue().isEmpty())
-                .map(cell -> cell.getCandidates().removeAll(presentValues))
+                .map(cell -> {
+                    Set<Integer> candidates = cell.getCandidates();
+                    boolean removedValues = candidates.removeAll(presentValues);
+                    if (candidates.size() == 0) {
+                        throw new IllegalArgumentException("Invalid grid");
+                    }
+                    return removedValues;
+                })
                 .toList();
 
         this.changeTracker = this.changeTracker || changesPerformed.stream().reduce(Boolean.FALSE, Boolean::logicalOr);
