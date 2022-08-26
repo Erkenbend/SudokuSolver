@@ -6,10 +6,16 @@ import java.util.Set;
 import java.util.stream.IntStream;
 
 public class Cell {
+    private final int rowIdx;
+    private final int colIdx;
+
     private Integer value;
     private Set<Integer> candidates;
 
-    public Cell(int value) {
+    public Cell(int rowIdx, int colIdx, int value) {
+        this.rowIdx = rowIdx;
+        this.colIdx = colIdx;
+
         if (value == 0) {
             this.value = null;
             this.candidates = new HashSet<>(IntStream.rangeClosed(1, 9).boxed().toList());
@@ -20,8 +26,18 @@ public class Cell {
     }
 
     public Cell(Cell other) {
+        this.rowIdx = other.rowIdx;
+        this.colIdx = other.colIdx;
         this.value = other.value;
         this.candidates = new HashSet<>(other.candidates);
+    }
+
+    public int getRowIdx() {
+        return this.rowIdx;
+    }
+
+    public int getColIdx() {
+        return this.colIdx;
     }
 
     public Optional<Integer> getValue() {

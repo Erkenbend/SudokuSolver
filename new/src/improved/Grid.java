@@ -25,7 +25,7 @@ public class Grid {
                 throw new IllegalArgumentException("Invalid dimensions");
             }
             for (int colIdx = 0; colIdx < 9; colIdx++) {
-                this.content[rowIdx][colIdx] = new Cell(row[colIdx]);
+                this.content[rowIdx][colIdx] = new Cell(rowIdx, colIdx, row[colIdx]);
             }
         }
     }
@@ -123,11 +123,11 @@ public class Grid {
     }
 
     public List<Grid> applyHypotheses() {
-        CellWithPosition bestFreeCell = this.findBestFreeCell()
+        Cell bestFreeCell = this.findBestFreeCell()
                 .orElseThrow(() -> new IllegalArgumentException("No free cells"));
 
         List<Grid> grids = new ArrayList<>();
-        for (int candidate : bestFreeCell.getTarget().getCandidates()) {
+        for (int candidate : bestFreeCell.getCandidates()) {
             Grid hypothesisGrid = new Grid(this);
             int rowIdx = bestFreeCell.getRowIdx();
             int colIdx = bestFreeCell.getColIdx();
@@ -138,9 +138,9 @@ public class Grid {
         return grids;
     }
 
-    private Optional<CellWithPosition> findBestFreeCell() {
+    private Optional<Cell> findBestFreeCell() {
         int minimalNbCandidates = 10;
-        CellWithPosition bestFreeCell = null;
+        Cell bestFreeCell = null;
         for (int rowIdx = 0; rowIdx < 9; rowIdx++) {
             Cell[] row = this.content[rowIdx];
             for (int colIdx = 0; colIdx < 9; colIdx++) {
@@ -148,7 +148,7 @@ public class Grid {
                 if (cell.getValue().isEmpty()) {
                     int nbCandidates = cell.getCandidates().size();
                     if (nbCandidates < minimalNbCandidates) {
-                        bestFreeCell = CellWithPosition.of(rowIdx, colIdx, cell);
+                        bestFreeCell = cell;
                         minimalNbCandidates = nbCandidates;
                     }
                 }
