@@ -77,7 +77,7 @@ public class Grid {
 
         this.tiedCellGroups.forEach(this::updateCandidates);
         this.convertLoneCandidates();
-        //this.tiedCellGroups.forEach(this::convertSingleStandingCandidates);
+        this.tiedCellGroups.forEach(this::convertSingleStandingCandidates);
     }
 
     public boolean isComplete() {
@@ -105,7 +105,10 @@ public class Grid {
                 .forEach(value -> {
                             List<Integer> candidatesIdxForValue = getCandidatesIdx(tiedCells, value);
                             if (candidatesIdxForValue.size() == 1) {
-                                tiedCells[candidatesIdxForValue.get(0)].writeValue(value);
+                                Cell candidate = tiedCells[candidatesIdxForValue.get(0)];
+                                if (candidate.getValue().isEmpty()) {
+                                    candidate.writeValue(value);
+                                }
                             }
                         }
                 );
@@ -116,7 +119,10 @@ public class Grid {
 
         for (int cellIdx = 0; cellIdx < 9; cellIdx++) {
             Cell cell = tiedCells[cellIdx];
-            if (cell.getValue().isEmpty() && cell.getCandidates().contains(value)) {
+            Optional<Integer> cellValue = cell.getValue();
+            if ((cellValue.isPresent() && cellValue.get() == value)
+                    || (cellValue.isEmpty() && cell.getCandidates().contains(value))
+            ) {
                 candidatesIdxForValue.add(cellIdx);
             }
         }
