@@ -1,13 +1,18 @@
 package improved;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class Grid {
     private final Cell[][] content;
-    private List<Cell[]> tiedCellGroups = new ArrayList<>();
+    private List<List<Cell>> tiedCellGroups = new ArrayList<>();
     private boolean changeTracker = false;
+    private final List<Integer> history;
 
     public Grid(int[][] rawContent) {
         if (rawContent == null) {
@@ -25,9 +30,15 @@ public class Grid {
                 throw new IllegalArgumentException("Invalid dimensions");
             }
             for (int colIdx = 0; colIdx < 9; colIdx++) {
-                this.content[rowIdx][colIdx] = new Cell(rowIdx, colIdx, row[colIdx]);
+                int value = row[colIdx];
+                if (value < 0 || value > 9) {
+                    throw new IllegalArgumentException("Invalid value");
+                }
+                this.content[rowIdx][colIdx] = new Cell(rowIdx, colIdx, value);
             }
         }
+
+        this.history = new ArrayList<>();
     }
 
     public Grid(Grid other) {
@@ -40,6 +51,7 @@ public class Grid {
         this.content = content;
         this.changeTracker = false;
         this.tiedCellGroups = new ArrayList<>();
+        this.history = new ArrayList<>(other.history);
     }
 
     public int[][] toIntMatrix() {
@@ -76,6 +88,15 @@ public class Grid {
         return stringBuilder.toString();
     }
 
+    public String getHistory() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("%d guess%s needed\n".formatted(this.history.size() - 1, this.history.size() == 2 ? "" : "es"));
+        for (int nbPasses : this.history) {
+            sb.append("* %d pass%s\n".formatted(nbPasses, nbPasses == 1 ? "" : "es"));
+        }
+        return sb.toString();
+    }
+
     public boolean isChanging() {
         boolean tmpChangeTracker = this.changeTracker;
         this.changeTracker = false;
@@ -86,19 +107,21 @@ public class Grid {
      * @return true if grid is complete, false if stuck, throws if grid is invalid
      */
     public boolean simpleSolve() {
-        // int nbPasses = 0;
+        int nbPasses = 0;
+        boolean success = false;
         do {
+            nbPasses++;
             this.performOnePass();
-            // System.out.printf("Pass %d:%n", ++nbPasses);
-            // System.out.println(this);
 
             if (this.isComplete()) {
-                return true;
+                success = true;
+                break;
             }
 
         } while (this.isChanging());
 
-        return false;
+        this.history.add(nbPasses);
+        return success;
     }
 
     public void performOnePass() {
@@ -127,11 +150,13 @@ public class Grid {
                 .orElseThrow(() -> new IllegalArgumentException("No free cells"));
 
         List<Grid> grids = new ArrayList<>();
-        for (int candidate : bestFreeCell.getCandidates()) {
+        Set<Integer> candidates = Set.copyOf(bestFreeCell.getCandidates());
+        for (int candidate : candidates) {
             Grid hypothesisGrid = new Grid(this);
+            hypothesisGrid.computeTiedCellGroups();
             int rowIdx = bestFreeCell.getRowIdx();
             int colIdx = bestFreeCell.getColIdx();
-            //System.out.printf("Assuming value %d in cell (%d, %d)%n", candidate, rowIdx, colIdx);
+            // System.out.printf("Assuming value %d in cell (%d, %d)%n", candidate, rowIdx, colIdx);
             hypothesisGrid.content[rowIdx][colIdx].writeValue(candidate);
             grids.add(hypothesisGrid);
         }
@@ -164,14 +189,30 @@ public class Grid {
                     this.tiedCellGroups.add(this.getCol(idx));
                     this.tiedCellGroups.add(this.getBlock(idx / 3, idx % 3));
                 });
+
+        tiedCellGroups.forEach(cellGroup -> {
+            // check group validity
+            List<Integer> valuesInGroup = cellGroup.stream()
+                    .map(Cell::getValue)
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .toList();
+
+            if (valuesInGroup.size() != Set.copyOf(valuesInGroup).size()) {
+                throw new IllegalArgumentException("Invalid grid, duplicate values in tied cells");
+            }
+
+            // add group info to each cell
+            cellGroup.forEach(cell -> cell.addTiedCells(cellGroup));
+        });
     }
 
-    private void convertSingleStandingCandidates(Cell[] tiedCells) {
+    private void convertSingleStandingCandidates(List<Cell> tiedCells) {
         IntStream.rangeClosed(1, 9)
                 .forEach(value -> {
                             List<Integer> candidatesIdxForValue = getCandidatesIdx(tiedCells, value);
                             if (candidatesIdxForValue.size() == 1) {
-                                Cell candidate = tiedCells[candidatesIdxForValue.get(0)];
+                                Cell candidate = tiedCells.get(candidatesIdxForValue.get(0));
                                 if (candidate.getValue().isEmpty()) {
                                     candidate.writeValue(value);
                                     this.changeTracker = true;
@@ -181,11 +222,11 @@ public class Grid {
                 );
     }
 
-    private List<Integer> getCandidatesIdx(Cell[] tiedCells, int value) {
+    private List<Integer> getCandidatesIdx(List<Cell> tiedCells, int value) {
         List<Integer> candidatesIdxForValue = new ArrayList<>();
 
         for (int cellIdx = 0; cellIdx < 9; cellIdx++) {
-            Cell cell = tiedCells[cellIdx];
+            Cell cell = tiedCells.get(cellIdx);
             Optional<Integer> cellValue = cell.getValue();
             if ((cellValue.isPresent() && cellValue.get() == value)
                     || (cellValue.isEmpty() && cell.getCandidates().contains(value))
@@ -207,32 +248,31 @@ public class Grid {
         }
     }
 
-    private Cell[] getRow(int rowIdx) {
-        return this.content[rowIdx];
+    private List<Cell> getRow(int rowIdx) {
+        return Arrays.stream(this.content[rowIdx])
+                .toList();
     }
 
-    private Cell[] getCol(int colIdx) {
+    private List<Cell> getCol(int colIdx) {
         return Arrays.stream(this.content)
                 .map(row -> row[colIdx])
-                .toList()
-                .toArray(new Cell[9]);
+                .toList();
     }
 
-    private Cell[] getBlock(int blockRowIdx, int blockColIdx) {
+    private List<Cell> getBlock(int blockRowIdx, int blockColIdx) {
         return IntStream.range(0, 9)
                 .mapToObj(i -> this.content[3 * blockRowIdx + i / 3][3 * blockColIdx + i % 3])
-                .toList()
-                .toArray(new Cell[9]);
+                .toList();
     }
 
-    private void updateCandidates(Cell[] tiedCells) {
-        Set<Integer> presentValues = Arrays.stream(tiedCells)
+    private void updateCandidates(List<Cell> tiedCells) {
+        Set<Integer> presentValues = tiedCells.stream()
                 .map(Cell::getValue)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(Collectors.toSet());
 
-        List<Boolean> changesPerformed = Arrays.stream(tiedCells)
+        List<Boolean> changesPerformed = tiedCells.stream()
                 .filter(cell -> cell.getValue().isEmpty())
                 .map(cell -> {
                     Set<Integer> candidates = cell.getCandidates();

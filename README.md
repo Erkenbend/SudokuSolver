@@ -10,4 +10,4 @@ Now in 2022, my goal is to use the 6 years of programming experience I have accu
 
 * `old`: Oct. 2016 -- original untouched version
 * `old_modernized`: Jul. 2022 -- minor changes to the original, making it compatible for a CodeWars problem
-* TODO
+* `improved`: Aug. 2022 -- new implementation based on groups of tied cells with a cleaner backtracking algorithm
